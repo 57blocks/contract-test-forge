@@ -1,0 +1,22 @@
+{
+  "name": "contract-test-forge",
+  "version": "0.0.1",
+  "license": "MIT",
+  "bin": {
+    "ctf": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "@types/commander": "^2.12.5",
+    "@types/node": "^22.10.5"
+  }
+}
