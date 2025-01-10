@@ -1,25 +1,261 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
+import { Command } from "commander";
+import * as fs from "fs";
+import * as path from "path";
+import * as yaml from "js-yaml";
+import * as parser from "@solidity-parser/parser";
+import { ProjectConfig } from "./types";
 
 const program = new Command();
 
 program
-  .name('ctf')
-  .description('A CLI tool for generating contract testing code')
-  .version('0.0.1');
+  .name("ctf")
+  .description("A CLI tool for generating contract testing code")
+  .version("0.0.1");
 
 program
-  .command('init')
-  .description('Initialize the ctf configration for the project')
-  .option('-e, --enthusiastic', 'Add enthusiasm')
-  .action((name: string, options: { enthusiastic?: boolean }) => {
-    const greetingName = name || 'World';
-    let greeting = `Hello, ${greetingName}!`;
-    if (options.enthusiastic) {
-      greeting = greeting.toUpperCase() + '!!!';
+  .command("init")
+  .description("Initialize the ctf configration for the project")
+  .action(() => {
+    const currentDir = process.cwd();
+
+    let projectName = "your-project-name";
+    let projectVersion = "1.0.0";
+
+    // try to read package.json
+    const packageJsonPath = path.join(currentDir, "package.json");
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(
+          fs.readFileSync(packageJsonPath, "utf-8")
+        );
+        projectName = packageJson.name || projectName;
+        projectVersion = packageJson.version || projectVersion;
+      } catch (error) {
+        console.warn(
+          "Warning: Failed to parse package.json, using default values"
+        );
+      }
     }
-    console.log(greeting);
+
+    // check contracts directory
+    const contractsPath = path.join(currentDir, "contracts");
+    if (!fs.existsSync(contractsPath)) {
+      console.error(
+        "Error: contracts directory not found. Please ensure your project has a contracts directory."
+      );
+      process.exit(1);
+    }
+
+    // check and create test directory
+    const testPath = path.join(currentDir, "test");
+    if (!fs.existsSync(testPath)) {
+      console.log("Creating test directory...");
+      fs.mkdirSync(testPath);
+    }
+
+    // create .ctf directory
+    const ctfPath = path.join(currentDir, ".ctf");
+    if (!fs.existsSync(ctfPath)) {
+      console.log("Creating .ctf directory...");
+      fs.mkdirSync(ctfPath);
+    }
+
+    // create project.yaml
+    const projectConfig: ProjectConfig = {
+      name: projectName,
+      version: projectVersion,
+      contracts_dir: "./contracts",
+      test_dir: "./test",
+      test_framework: "hardhat",
+    };
+
+    if (!fs.existsSync(path.join(ctfPath, "project.yaml"))) {
+      fs.writeFileSync(
+        path.join(ctfPath, "project.yaml"),
+        yaml.dump(projectConfig)
+      );
+    }
+
+    // create ai.yaml
+    const aiConfig = {
+      model: "gpt-4",
+      api_key: "",
+    };
+
+    if (!fs.existsSync(path.join(ctfPath, "ai.yaml"))) {
+      fs.writeFileSync(path.join(ctfPath, "ai.yaml"), yaml.dump(aiConfig));
+    }
+
+    console.log("Initialization complete!");
+  });
+
+interface ContractFunction {
+  name: string;
+  visibility: string;
+  params: Array<{
+    name: string;
+    type: string;
+  }>;
+  returns?: Array<{
+    type: string;
+  }>;
+  stateMutability?: string;
+  code: string;
+}
+
+program
+  .command("gent")
+  .description(
+    `
+Generate test cases for the project.
+
+example:
+
+ctf gentest -f MyContract.sol -m myMethod
+    `
+  )
+  .option("-f, --file <file>", "The contract file to generate test cases")
+  .option("-m, --method <method>", "The contract method to generate test cases")
+  .action((options) => {
+    const { file, method } = options;
+    if (!file) {
+      console.error(
+        "Error: Please provide the contract file name when generating test cases"
+      );
+      process.exit(1);
+    }
+
+    const currentDir = process.cwd();
+    const ctfPath = path.join(currentDir, ".ctf");
+
+    // Check if .ctf directory exists
+    if (!fs.existsSync(ctfPath)) {
+      console.error(
+        "Error: .ctf directory not found. Please run 'ctf init' first"
+      );
+      process.exit(1);
+    }
+
+    // Read project.yaml
+    const projectYamlPath = path.join(ctfPath, "project.yaml");
+    if (!fs.existsSync(projectYamlPath)) {
+      console.error(
+        "Error: project.yaml not found. Please run 'ctf init' first"
+      );
+      process.exit(1);
+    }
+
+    let projectConfig: ProjectConfig;
+    try {
+      projectConfig = yaml.load(
+        fs.readFileSync(projectYamlPath, "utf-8")
+      ) as ProjectConfig;
+    } catch (error) {
+      console.error("Error: Failed to parse project.yaml");
+      process.exit(1);
+    }
+
+    const contractsPath = path.join(currentDir, projectConfig.contracts_dir);
+    const contractFilePath = path.join(contractsPath, file);
+
+    // check if file exists
+    if (!fs.existsSync(contractFilePath)) {
+      console.error(
+        `Error: Contract file ${file} not found in contracts directory`
+      );
+      process.exit(1);
+    }
+
+    // read contract file content
+    const contractContent = fs.readFileSync(contractFilePath, "utf-8");
+
+    let functions: ContractFunction[] = [];
+    try {
+      const ast = parser.parse(contractContent, { loc: true });
+
+      parser.visit(ast, {
+        FunctionDefinition: function (node) {
+          if (node.isConstructor) return; // skip constructor
+
+          // Split content into lines and extract function code
+          const lines = contractContent.split("\n");
+          const functionLines = lines.slice(
+            node.loc!.start.line - 1,
+            node.loc!.end.line
+          );
+
+          const functionCode = functionLines.join("\n");
+
+          const func: ContractFunction = {
+            name: node.name || "",
+            visibility: node.visibility || "public",
+            params: node.parameters.map((param: any) => ({
+              name: param.name,
+              type: param.typeName.name,
+            })),
+            stateMutability: node.stateMutability || undefined,
+            code: functionCode,
+          };
+
+          if (node.returnParameters) {
+            func.returns = node.returnParameters.map((param: any) => ({
+              type: param.typeName.name,
+            }));
+          }
+
+          functions.push(func);
+        },
+      });
+
+      if (functions.length === 0) {
+        console.error(`Error: No functions found in ${file}`);
+        process.exit(1);
+      }
+
+      if (!method) {
+        // if no method is specified, show all methods
+        console.log(`Found ${functions.length} functions in ${file}:`);
+        functions.forEach((func) => {
+          const params = func.params
+            .map((p) => `${p.type} ${p.name}`)
+            .join(", ");
+          const returns = func.returns
+            ? ` returns (${func.returns.map((r) => r.type).join(", ")})`
+            : "";
+          const mutability = func.stateMutability
+            ? ` ${func.stateMutability}`
+            : "";
+
+          console.log(
+            `- ${func.name} (${func.visibility}${mutability}):\n` +
+              `${func.code}`
+          );
+        });
+      } else {
+        // if method is specified, find the corresponding method
+        const targetFunction = functions.find((func) => func.name === method);
+        if (!targetFunction) {
+          console.error(
+            `Error: Method ${method} not found in contract ${file}`
+          );
+          process.exit(1);
+        }
+
+        console.log(
+          `- ${targetFunction.name} (${targetFunction.visibility}${
+            targetFunction.stateMutability
+              ? ` ${targetFunction.stateMutability}`
+              : ""
+          }):\n` + `${targetFunction.code}`
+        );
+      }
+    } catch (error) {
+      console.error("Error: Failed to parse Solidity file");
+      console.error(error);
+      process.exit(1);
+    }
   });
 
 if (!process.argv.slice(2).length) {

@@ -32,4 +32,7 @@ coverage/
 
 # 临时文件
 tmp/
-temp/ 
+temp/
+
+# 项目配置
+.ctf/ 
