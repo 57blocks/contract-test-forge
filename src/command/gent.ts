@@ -4,6 +4,7 @@ import * as path from "path";
 import * as yaml from "js-yaml";
 import { parseContract } from "../lib/contract-parse";
 import { ProjectConfig } from "../types";
+import { AiService } from "../lib/ai-service";
 
 export function gent(program: Command) {
   program
@@ -22,7 +23,7 @@ ctf gentest -f MyContract.sol -m myMethod
       "-m, --method <method>",
       "The contract method to generate test cases"
     )
-    .action((options) => {
+    .action(async (options) => {
       const { file, method } = options;
       if (!file) {
         console.error(
@@ -80,22 +81,13 @@ ctf gentest -f MyContract.sol -m myMethod
         process.exit(1);
       }
 
-      if (!method) {
-        // if no method is specified, show all methods
-        console.log(`Found ${functions.length} functions in ${file}:`);
-        functions.forEach((func) => {
-          const mutability = func.stateMutability
-            ? ` ${func.stateMutability}`
-            : "";
+      const aiConfigPath = path.join(ctfPath, "ai.yaml");
+      const aiService = new AiService(aiConfigPath);
 
-          console.log(
-            `- ${func.name} (${func.visibility}${mutability}):\n` +
-              `${func.code}`
-          );
-        });
-      } else {
+      let targetFunctions = functions;
+      if (method) {
         // if method is specified, find the corresponding method
-        const targetFunctions = functions.filter(
+        targetFunctions = targetFunctions.filter(
           (func) => func.name === method
         );
         if (targetFunctions.length === 0) {
@@ -104,14 +96,27 @@ ctf gentest -f MyContract.sol -m myMethod
           );
           process.exit(1);
         }
+      }
 
-        targetFunctions.forEach((func) => {
-          console.log(
-            `- ${func.name} (${func.visibility}${
-              func.stateMutability ? ` ${func.stateMutability}` : ""
-            }):\n` + `${func.code}`
-          );
-        });
+      for (const func of targetFunctions) {
+        console.log(
+          `- ${func.name} (${func.visibility}${
+            func.stateMutability ? ` ${func.stateMutability}` : ""
+          }):\n${func.code}\n`
+        );
+
+        try {
+          console.log("start analyze...");
+          const analysis = await aiService.analyzeFunction(func);
+          console.log("\nSuggested test cases:");
+          console.log(`describe('${analysis.methodName}', () => {`);
+          analysis.testCases.forEach((testCase) => {
+            console.log(`  it('${testCase.type}: ${testCase.description}');`);
+          });
+          console.log("});\n");
+        } catch (error) {
+          console.error(`Failed to analyze ${func.name}: ${error}`);
+        }
       }
     });
 }

@@ -19,3 +19,18 @@ export interface ContractFunction {
   stateMutability?: string;
   code: string;
 }
+
+export interface TestCase {
+  type: 'positive' | 'negative';
+  description: string;
+}
+
+export interface TestAnalysis {
+  methodName: string;
+  testCases: TestCase[];
+}
+
+export interface AiConfig {
+  model: string;
+  api_key: string;
+}
