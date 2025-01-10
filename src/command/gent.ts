@@ -2,8 +2,8 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
-import * as parser from "@solidity-parser/parser";
-import { ProjectConfig, ContractFunction } from "../types";
+import { parseContract } from "../lib/contract-parse";
+import { ProjectConfig } from "../types";
 
 export function gent(program: Command) {
   program
@@ -72,93 +72,46 @@ ctf gentest -f MyContract.sol -m myMethod
         process.exit(1);
       }
 
-      // read contract file content
-      const contractContent = fs.readFileSync(contractFilePath, "utf-8");
+      // parse contract file
+      const functions = parseContract(contractFilePath);
 
-      let functions: ContractFunction[] = [];
-      try {
-        const ast = parser.parse(contractContent, { loc: true });
+      if (functions.length === 0) {
+        console.error(`Error: No functions found in ${file}`);
+        process.exit(1);
+      }
 
-        parser.visit(ast, {
-          FunctionDefinition: function (node) {
-            if (node.isConstructor) return; // skip constructor
+      if (!method) {
+        // if no method is specified, show all methods
+        console.log(`Found ${functions.length} functions in ${file}:`);
+        functions.forEach((func) => {
+          const mutability = func.stateMutability
+            ? ` ${func.stateMutability}`
+            : "";
 
-            // Split content into lines and extract function code
-            const lines = contractContent.split("\n");
-            const functionLines = lines.slice(
-              node.loc!.start.line - 1,
-              node.loc!.end.line
-            );
-
-            const functionCode = functionLines.join("\n");
-
-            const func: ContractFunction = {
-              name: node.name || "",
-              visibility: node.visibility || "public",
-              params: node.parameters.map((param: any) => ({
-                name: param.name,
-                type: param.typeName.name,
-              })),
-              stateMutability: node.stateMutability || undefined,
-              code: functionCode,
-            };
-
-            if (node.returnParameters) {
-              func.returns = node.returnParameters.map((param: any) => ({
-                type: param.typeName.name,
-              }));
-            }
-
-            functions.push(func);
-          },
+          console.log(
+            `- ${func.name} (${func.visibility}${mutability}):\n` +
+              `${func.code}`
+          );
         });
-
-        if (functions.length === 0) {
-          console.error(`Error: No functions found in ${file}`);
+      } else {
+        // if method is specified, find the corresponding method
+        const targetFunctions = functions.filter(
+          (func) => func.name === method
+        );
+        if (targetFunctions.length === 0) {
+          console.error(
+            `Error: Method ${method} not found in contract ${file}`
+          );
           process.exit(1);
         }
 
-        if (!method) {
-          // if no method is specified, show all methods
-          console.log(`Found ${functions.length} functions in ${file}:`);
-          functions.forEach((func) => {
-            const params = func.params
-              .map((p) => `${p.type} ${p.name}`)
-              .join(", ");
-            const returns = func.returns
-              ? ` returns (${func.returns.map((r) => r.type).join(", ")})`
-              : "";
-            const mutability = func.stateMutability
-              ? ` ${func.stateMutability}`
-              : "";
-
-            console.log(
-              `- ${func.name} (${func.visibility}${mutability}):\n` +
-                `${func.code}`
-            );
-          });
-        } else {
-          // if method is specified, find the corresponding method
-          const targetFunction = functions.find((func) => func.name === method);
-          if (!targetFunction) {
-            console.error(
-              `Error: Method ${method} not found in contract ${file}`
-            );
-            process.exit(1);
-          }
-
+        targetFunctions.forEach((func) => {
           console.log(
-            `- ${targetFunction.name} (${targetFunction.visibility}${
-              targetFunction.stateMutability
-                ? ` ${targetFunction.stateMutability}`
-                : ""
-            }):\n` + `${targetFunction.code}`
+            `- ${func.name} (${func.visibility}${
+              func.stateMutability ? ` ${func.stateMutability}` : ""
+            }):\n` + `${func.code}`
           );
-        }
-      } catch (error) {
-        console.error("Error: Failed to parse Solidity file");
-        console.error(error);
-        process.exit(1);
+        });
       }
     });
 }
