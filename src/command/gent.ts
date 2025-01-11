@@ -2,11 +2,26 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
+import * as readline from "readline";
 import chalk from "chalk";
 import { parseContract } from "../lib/contract-parse";
 import { ProjectConfig } from "../types";
 import { AiService } from "../lib/ai-service";
 import { CONFIG_PROJECT_FILE_NAME } from "../constants";
+
+function askForConfirmation(question: string): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
+    });
+  });
+}
 
 export function gent(program: Command) {
   program
@@ -113,7 +128,9 @@ ctf gentest -f MyContract.sol -m myMethod
           console.log(chalk.yellow("start analyze..."));
           const analysis = await aiService.analyzeFunction(func, file);
           console.log(chalk.blue("\nSuggested test cases:"));
-          console.log(chalk.green(`describe('${analysis.methodName}', () => {`));
+          console.log(
+            chalk.green(`describe('${analysis.methodName}', () => {`)
+          );
 
           analysis.testCases.forEach((testCase) => {
             console.log(
@@ -122,6 +139,18 @@ ctf gentest -f MyContract.sol -m myMethod
           });
 
           console.log(chalk.blue("});\n"));
+
+          // ask user to confirm
+          const confirmed = await askForConfirmation(
+            chalk.yellow("Are these test cases good? (y/n): ")
+          );
+
+          if (!confirmed) {
+            console.log(chalk.red("Analysis cancelled by user"));
+            process.exit(0);
+          }
+
+          console.log(chalk.green("Continuing with the analysis...\n"));
         } catch (error) {
           console.error(chalk.red(`Failed to analyze ${func.name}: ${error}`));
         }
