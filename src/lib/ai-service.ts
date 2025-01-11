@@ -1,3 +1,4 @@
+import path from "path";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import OpenAI from "openai";
@@ -6,19 +7,24 @@ import {
   CONTRACT_ANALYZE_SYSTEM_PROMPT,
   contractAnalyzePrompt,
 } from "../prompt";
+import { CacheManager } from "./cache-manager";
+import { CONFIG_AI_FILE_NAME } from "../constants";
 
 export class AiService {
   private config: AiConfig;
   private openai: OpenAI;
+  private cacheManager: CacheManager;
 
-  constructor(configPath: string) {
-    this.config = this.loadConfig(configPath);
+  constructor(ctfPath: string) {
+    const aiConfigPath = path.join(ctfPath, CONFIG_AI_FILE_NAME);
+    this.config = this.loadConfig(aiConfigPath);
     if (!this.config.api_key) {
       throw new Error("API key is required, please set it in ai.yaml");
     }
     this.openai = new OpenAI({
       apiKey: this.config.api_key,
     });
+    this.cacheManager = new CacheManager(ctfPath);
   }
 
   private loadConfig(configPath: string): AiConfig {
@@ -29,12 +35,28 @@ export class AiService {
     }
   }
 
-  async analyzeFunction(func: ContractFunction): Promise<TestAnalysis> {
+  async analyzeFunction(
+    func: ContractFunction,
+    contractFile: string
+  ): Promise<TestAnalysis> {
+    // Try to get from cache first
+    const cachedAnalysis = this.cacheManager.getCache(contractFile, func.name);
+    if (cachedAnalysis) {
+      console.log(`Using cached analysis for ${func.name}`);
+      return cachedAnalysis;
+    }
+
+    console.log(`No cache found for ${func.name}, analyzing with AI...`);
     const prompt = contractAnalyzePrompt(func.code);
 
     try {
       const response = await this.callAiApi(prompt);
-      return this.parseAiResponse(response, func.name);
+      const analysis = this.parseAiResponse(response, func.name);
+
+      // Save to cache
+      this.cacheManager.saveCache(contractFile, func.name, analysis);
+
+      return analysis;
     } catch (error) {
       throw new Error(`Failed to analyze function: ${error}`);
     }

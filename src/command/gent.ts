@@ -82,9 +82,6 @@ ctf gentest -f MyContract.sol -m myMethod
         process.exit(1);
       }
 
-      const aiConfigPath = path.join(ctfPath, CONFIG_AI_FILE_NAME);
-      const aiService = new AiService(aiConfigPath);
-
       let targetFunctions = functions;
       if (method) {
         // if method is specified, find the corresponding method
@@ -99,8 +96,9 @@ ctf gentest -f MyContract.sol -m myMethod
         }
       }
 
+      const aiService = new AiService(ctfPath);
       for (const func of targetFunctions) {
-        console.log(
+        console.debug(
           `- ${func.name} (${func.visibility}${
             func.stateMutability ? ` ${func.stateMutability}` : ""
           }):\n${func.code}\n`
@@ -108,7 +106,7 @@ ctf gentest -f MyContract.sol -m myMethod
 
         try {
           console.log("start analyze...");
-          const analysis = await aiService.analyzeFunction(func);
+          const analysis = await aiService.analyzeFunction(func, file);
           console.log("\nSuggested test cases:");
           console.log(`describe('${analysis.methodName}', () => {`);
           analysis.testCases.forEach((testCase) => {
