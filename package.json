@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@solidity-parser/parser": "^0.19.0",
+    "chalk": "^4.1.2",
     "commander": "^13.0.0",
     "js-yaml": "^4.1.0",
     "openai": "^4.78.0",

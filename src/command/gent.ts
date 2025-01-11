@@ -2,10 +2,11 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
+import chalk from "chalk";
 import { parseContract } from "../lib/contract-parse";
 import { ProjectConfig } from "../types";
 import { AiService } from "../lib/ai-service";
-import { CONFIG_AI_FILE_NAME, CONFIG_PROJECT_FILE_NAME } from "../constants";
+import { CONFIG_PROJECT_FILE_NAME } from "../constants";
 
 export function gent(program: Command) {
   program
@@ -99,22 +100,30 @@ ctf gentest -f MyContract.sol -m myMethod
       const aiService = new AiService(ctfPath);
       for (const func of targetFunctions) {
         console.debug(
-          `- ${func.name} (${func.visibility}${
-            func.stateMutability ? ` ${func.stateMutability}` : ""
-          }):\n${func.code}\n`
+          chalk.cyan(`- ${func.name}`) +
+            chalk.gray(
+              ` (${func.visibility}${
+                func.stateMutability ? ` ${func.stateMutability}` : ""
+              }):\n`
+            ) +
+            chalk.white(`${func.code}\n`)
         );
 
         try {
-          console.log("start analyze...");
+          console.log(chalk.yellow("start analyze..."));
           const analysis = await aiService.analyzeFunction(func, file);
-          console.log("\nSuggested test cases:");
-          console.log(`describe('${analysis.methodName}', () => {`);
+          console.log(chalk.blue("\nSuggested test cases:"));
+          console.log(chalk.green(`describe('${analysis.methodName}', () => {`));
+
           analysis.testCases.forEach((testCase) => {
-            console.log(`  it('${testCase.type}: ${testCase.description}');`);
+            console.log(
+              chalk.green(`  it('${testCase.type}: ${testCase.description}');`)
+            );
           });
-          console.log("});\n");
+
+          console.log(chalk.blue("});\n"));
         } catch (error) {
-          console.error(`Failed to analyze ${func.name}: ${error}`);
+          console.error(chalk.red(`Failed to analyze ${func.name}: ${error}`));
         }
       }
     });
