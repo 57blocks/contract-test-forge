@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import { ProjectConfig } from "../types";
+import { CONFIG_AI_FILE_NAME, CONFIG_PROJECT_FILE_NAME } from "../constants";
 
 export function init(program: Command) {
   program
@@ -62,9 +63,9 @@ export function init(program: Command) {
         test_framework: "hardhat",
       };
 
-      if (!fs.existsSync(path.join(ctfPath, "project.yaml"))) {
+      if (!fs.existsSync(path.join(ctfPath, CONFIG_PROJECT_FILE_NAME))) {
         fs.writeFileSync(
-          path.join(ctfPath, "project.yaml"),
+          path.join(ctfPath, CONFIG_PROJECT_FILE_NAME),
           yaml.dump(projectConfig)
         );
       }
@@ -75,8 +76,8 @@ export function init(program: Command) {
         api_key: "",
       };
 
-      if (!fs.existsSync(path.join(ctfPath, "ai.yaml"))) {
-        fs.writeFileSync(path.join(ctfPath, "ai.yaml"), yaml.dump(aiConfig));
+      if (!fs.existsSync(path.join(ctfPath, CONFIG_AI_FILE_NAME))) {
+        fs.writeFileSync(path.join(ctfPath, CONFIG_AI_FILE_NAME), yaml.dump(aiConfig));
       }
 
       console.log("Initialization complete!");

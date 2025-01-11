@@ -5,6 +5,7 @@ import * as yaml from "js-yaml";
 import { parseContract } from "../lib/contract-parse";
 import { ProjectConfig } from "../types";
 import { AiService } from "../lib/ai-service";
+import { CONFIG_AI_FILE_NAME, CONFIG_PROJECT_FILE_NAME } from "../constants";
 
 export function gent(program: Command) {
   program
@@ -44,10 +45,10 @@ ctf gentest -f MyContract.sol -m myMethod
       }
 
       // Read project.yaml
-      const projectYamlPath = path.join(ctfPath, "project.yaml");
+      const projectYamlPath = path.join(ctfPath, CONFIG_PROJECT_FILE_NAME);
       if (!fs.existsSync(projectYamlPath)) {
         console.error(
-          "Error: project.yaml not found. Please run 'ctf init' first"
+          `Error: ${CONFIG_PROJECT_FILE_NAME} not found. Please run 'ctf init' first`
         );
         process.exit(1);
       }
@@ -81,7 +82,7 @@ ctf gentest -f MyContract.sol -m myMethod
         process.exit(1);
       }
 
-      const aiConfigPath = path.join(ctfPath, "ai.yaml");
+      const aiConfigPath = path.join(ctfPath, CONFIG_AI_FILE_NAME);
       const aiService = new AiService(aiConfigPath);
 
       let targetFunctions = functions;
