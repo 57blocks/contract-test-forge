@@ -5,9 +5,10 @@ import * as yaml from "js-yaml";
 import * as readline from "readline";
 import chalk from "chalk";
 import { parseContract } from "../lib/contract-parse";
-import { ProjectConfig } from "../types";
+import { ProjectConfig, TestGenerator } from "../types";
 import { AiService } from "../lib/ai-service";
 import { CONFIG_PROJECT_FILE_NAME } from "../constants";
+import { TestGeneratorService } from "../lib/test-generator";
 
 function askForConfirmation(question: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -113,6 +114,8 @@ ctf gentest -f MyContract.sol -m myMethod
       }
 
       const aiService = new AiService(ctfPath);
+      const analyzedFunctions = [];
+
       for (const func of targetFunctions) {
         console.debug(
           chalk.cyan(`- ${func.name}`) +
@@ -127,6 +130,8 @@ ctf gentest -f MyContract.sol -m myMethod
         try {
           console.log(chalk.yellow("start analyze..."));
           const analysis = await aiService.analyzeFunction(func, file);
+
+          // show analysis result
           console.log(chalk.blue("\nSuggested test cases:"));
           console.log(
             chalk.green(`describe('${analysis.methodName}', () => {`)
@@ -150,10 +155,64 @@ ctf gentest -f MyContract.sol -m myMethod
             process.exit(0);
           }
 
-          console.log(chalk.green("Continuing with the analysis...\n"));
+          // save confirmed analysis
+          analyzedFunctions.push({
+            code: func.code,
+            analysis,
+          });
+
+          console.log(chalk.green("Analysis saved for test generation\n"));
         } catch (error) {
           console.error(chalk.red(`Failed to analyze ${func.name}: ${error}`));
         }
       }
+
+      // generate test file
+      const testGenerator = new TestGeneratorService(ctfPath);
+
+      const generateTests = [];
+      const contractName = path.basename(file, path.extname(file));
+      for (const analyzedFunction of analyzedFunctions) {
+        console.log(
+          chalk.yellow(
+            `Generating test for ${contractName} - ${analyzedFunction.analysis.methodName}`
+          )
+        );
+        try {
+          const testData: TestGenerator = {
+            contractName,
+            code: analyzedFunction.code,
+            analysis: analyzedFunction.analysis,
+          };
+
+          const generatedTest = await testGenerator.generateTest(testData);
+          generateTests.push(generatedTest);
+        } catch (error) {
+          console.error(chalk.red("Failed to generate test file:", error));
+          throw error;
+        }
+      }
+      console.log(chalk.green("All tests generated"));
+
+      if (generateTests.length === 0) {
+        console.log(chalk.red("No test cases to generate"));
+        process.exit(0);
+      }
+
+      console.log(chalk.yellow("Generating the final test file..."));
+      await testGenerator.writeTestFile(
+        path.join(currentDir, projectConfig.test_dir),
+        file,
+        generateTests
+      );
+
+      console.log(
+        chalk.green(
+          `\nTest file generated: ${path.join(
+            projectConfig.test_dir,
+            path.basename(file, path.extname(file)) + ".test.ts"
+          )}`
+        )
+      );
     });
 }

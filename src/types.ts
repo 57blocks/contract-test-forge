@@ -30,6 +30,18 @@ export interface TestAnalysis {
   testCases: TestCase[];
 }
 
+export interface TestGenerator {
+  contractName: string;
+  code: string;
+  analysis: TestAnalysis;
+}
+
+export interface GeneratedTest {
+  imports: string[];
+  setupCode: string;
+  testCases: string;
+}
+
 export interface AiConfig {
   model: string;
   api_key: string;
