@@ -6,7 +6,7 @@ import * as readline from "readline";
 import chalk from "chalk";
 import { parseContract } from "../lib/contract-parse";
 import { ProjectConfig, TestGenerator } from "../types";
-import { AiService } from "../lib/ai-service";
+import { TestAnalyzer} from "../lib/test-analyzer";
 import { CONFIG_PROJECT_FILE_NAME } from "../constants";
 import { TestGeneratorService } from "../lib/test-generator";
 
@@ -40,6 +40,10 @@ ctf gentest -f MyContract.sol -m myMethod
     .option(
       "-m, --method <method>",
       "The contract method to generate test cases"
+    )
+    .option(
+      "-y, --yes",
+      "Automatically confirm the test cases"
     )
     .action(async (options) => {
       const { file, method } = options;
@@ -80,6 +84,14 @@ ctf gentest -f MyContract.sol -m myMethod
         process.exit(1);
       }
 
+      console.log(
+        chalk.yellow(
+          `Start generating test cases for ${file} ${
+            method ? `method: ${method}` : ""
+          }`
+        )
+      );
+
       const contractsPath = path.join(currentDir, projectConfig.contracts_dir);
       const contractFilePath = path.join(contractsPath, file);
 
@@ -92,6 +104,7 @@ ctf gentest -f MyContract.sol -m myMethod
       }
 
       // parse contract file
+      console.log(chalk.yellow("Parsing contract file..."));
       const functions = parseContract(contractFilePath);
 
       if (functions.length === 0) {
@@ -113,46 +126,38 @@ ctf gentest -f MyContract.sol -m myMethod
         }
       }
 
-      const aiService = new AiService(ctfPath);
+      console.log(chalk.yellow("Analyzing test cases for contract file..."));
+      const aiService = new TestAnalyzer(ctfPath);
       const analyzedFunctions = [];
 
       for (const func of targetFunctions) {
         console.debug(
-          chalk.cyan(`- ${func.name}`) +
+          chalk.cyan(`- method ${func.name}`) +
             chalk.gray(
               ` (${func.visibility}${
                 func.stateMutability ? ` ${func.stateMutability}` : ""
-              }):\n`
+              }) source code:\n`
             ) +
             chalk.white(`${func.code}\n`)
         );
 
         try {
-          console.log(chalk.yellow("start analyze..."));
+          console.log(chalk.yellow(`Analyze the test cases for method ${func.name}...`));
           const analysis = await aiService.analyzeFunction(func, file);
 
           // show analysis result
-          console.log(chalk.blue("\nSuggested test cases:"));
-          console.log(
-            chalk.green(`describe('${analysis.methodName}', () => {`)
-          );
-
-          analysis.testCases.forEach((testCase) => {
-            console.log(
-              chalk.green(`  it('${testCase.type}: ${testCase.description}');`)
-            );
-          });
-
-          console.log(chalk.blue("});\n"));
+          aiService.showAnalysis(analysis);
 
           // ask user to confirm
-          const confirmed = await askForConfirmation(
-            chalk.yellow("Are these test cases good? (y/n): ")
-          );
+          if (!options.yes) {
+            const confirmed = await askForConfirmation(
+              chalk.yellow("Are these test cases good? (y/n): ")
+            );
 
-          if (!confirmed) {
-            console.log(chalk.red("Analysis cancelled by user"));
-            process.exit(0);
+            if (!confirmed) {
+              console.log(chalk.red("Analysis cancelled by user"));
+              process.exit(0);
+            }
           }
 
           // save confirmed analysis
@@ -167,9 +172,9 @@ ctf gentest -f MyContract.sol -m myMethod
         }
       }
 
-      // generate test file
+      // generate test cases
+      console.log(chalk.yellow("Generating test cases..."));
       const testGenerator = new TestGeneratorService(ctfPath);
-
       const generateTests = [];
       const contractName = path.basename(file, path.extname(file));
       for (const analyzedFunction of analyzedFunctions) {
@@ -187,12 +192,12 @@ ctf gentest -f MyContract.sol -m myMethod
 
           const generatedTest = await testGenerator.generateTest(testData);
           generateTests.push(generatedTest);
+          console.log(chalk.green("Test case generated"));
         } catch (error) {
           console.error(chalk.red("Failed to generate test file:", error));
           throw error;
         }
       }
-      console.log(chalk.green("All tests generated"));
 
       if (generateTests.length === 0) {
         console.log(chalk.red("No test cases to generate"));

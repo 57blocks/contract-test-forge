@@ -2,15 +2,16 @@ import path from "path";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import OpenAI from "openai";
-import { ContractFunction, AiConfig, TestAnalysis, TestCase } from "../types";
+import { ContractFunction, AiConfig, TestAnalysis } from "../types";
 import {
   CONTRACT_ANALYZE_SYSTEM_PROMPT,
   contractAnalyzePrompt,
 } from "../prompt";
 import { CacheManager } from "./cache-manager";
 import { CONFIG_AI_FILE_NAME } from "../constants";
+import chalk from "chalk";
 
-export class AiService {
+export class TestAnalyzer {
   private config: AiConfig;
   private openai: OpenAI;
   private cacheManager: CacheManager;
@@ -50,7 +51,7 @@ export class AiService {
     const prompt = contractAnalyzePrompt(func.code);
 
     try {
-      const response = await this.callAiApi(prompt);
+      const response = await this.analyze(prompt);
       const analysis = this.parseAiResponse(response, func.name);
 
       // Save to cache
@@ -62,7 +63,22 @@ export class AiService {
     }
   }
 
-  private async callAiApi(prompt: string): Promise<string> {
+  showAnalysis(analysis: TestAnalysis) {
+    console.log(chalk.blue("\nSuggested test cases:"));
+    console.log(
+      chalk.green(`describe('${analysis.methodName}', () => {`)
+    );
+
+    analysis.testCases.forEach((testCase) => {
+      console.log(
+        chalk.green(`  it('${testCase.type}: ${testCase.description}');`)
+      );
+    });
+
+    console.log(chalk.blue("});\n"));
+  }
+
+  private async analyze(prompt: string): Promise<string> {
     try {
       const completion = await this.openai.chat.completions.create({
         model: this.config.model,
