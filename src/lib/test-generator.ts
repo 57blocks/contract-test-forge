@@ -2,17 +2,26 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import OpenAI from "openai";
-import { TestGenerator, GeneratedTest, AiConfig } from "../types";
-import { TEST_GENERATE_SYSTEM_PROMPT, testGeneratePrompt, TEST_MERGE_SYSTEM_PROMPT, testMergePrompt } from "../prompt";
+import { TestGenerator, GeneratedTest, AiConfig, TestPattern } from "../types";
+import {
+  TEST_GENERATE_SYSTEM_PROMPT,
+  testGeneratePrompt,
+  TEST_MERGE_SYSTEM_PROMPT,
+  testMergePrompt,
+} from "../prompt";
 import { CONFIG_AI_FILE_NAME } from "../constants";
+import { testCraft } from "../pattern/test-craft";
+import { eal } from "../pattern/eal";
 
 export class TestGeneratorService {
   private openai: OpenAI;
   private config: AiConfig;
+  private patterns: TestPattern;
 
   constructor(ctfPath: string) {
     const aiConfigPath = path.join(ctfPath, CONFIG_AI_FILE_NAME);
     this.config = this.loadConfig(aiConfigPath);
+    this.patterns = this.loadTestPatterns();
     if (!this.config.api_key) {
       throw new Error("API key is required, please set it in ai.yaml");
     }
@@ -29,6 +38,13 @@ export class TestGeneratorService {
     }
   }
 
+  private loadTestPatterns(): TestPattern {
+    return {
+      evm_unit_test_principles: testCraft.evm_unit_test_principles,
+      common_mistakes_to_avoid: eal.common_mistakes_to_avoid,
+    };
+  }
+
   async generateTest(data: TestGenerator): Promise<GeneratedTest> {
     const prompt = testGeneratePrompt(data);
 
@@ -38,7 +54,7 @@ export class TestGeneratorService {
         messages: [
           {
             role: "system",
-            content: TEST_GENERATE_SYSTEM_PROMPT,
+            content: TEST_GENERATE_SYSTEM_PROMPT(this.patterns),
           },
           {
             role: "user",
@@ -69,18 +85,19 @@ export class TestGeneratorService {
     contractFile: string,
     tests: GeneratedTest[]
   ): Promise<void> {
-    const contractName = path.basename(contractFile, path.extname(contractFile));
+    const contractName = path.basename(
+      contractFile,
+      path.extname(contractFile)
+    );
     const testFilePath = path.join(testDir, `${contractName}.test.ts`);
-
-    const mergedTest = await this.mergeTests(contractName, tests);
-    const testContent = this.formatTestContent(mergedTest);
+    const testContent = await this.mergeTests(contractName, tests);
     fs.writeFileSync(testFilePath, testContent);
   }
 
   private async mergeTests(
     contractName: string,
     tests: GeneratedTest[]
-  ): Promise<GeneratedTest> {
+  ): Promise<string> {
     try {
       const completion = await this.openai.chat.completions.create({
         model: this.config.model,
@@ -96,29 +113,10 @@ export class TestGeneratorService {
         ],
       });
 
-      const response = completion.choices[0]?.message?.content || "";
-      return this.parseTestResponse(response);
+      return completion.choices[0]?.message?.content || "";
     } catch (error) {
       console.error("Failed to merge tests:", error);
-      return this.fallbackMergeTests(tests);
+      throw error;
     }
-  }
-
-  private fallbackMergeTests(tests: GeneratedTest[]): GeneratedTest {
-    return {
-      imports: Array.from(new Set(tests.flatMap((test) => test.imports))).sort(),
-      setupCode: Array.from(new Set(tests.map((test) => test.setupCode))).join("\n\n"),
-      testCases: tests.map((test) => test.testCases).join("\n\n"),
-    };
-  }
-
-  private formatTestContent(test: GeneratedTest): string {
-    return `
-${test.imports.join("\n")}
-
-${test.setupCode}
-
-${test.testCases}
-`.trim();
   }
 }

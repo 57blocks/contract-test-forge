@@ -46,3 +46,17 @@ export interface AiConfig {
   model: string;
   api_key: string;
 }
+
+export interface TestPattern {
+    evm_unit_test_principles: Array<{
+      title: string;
+      description: string;
+      examples?: string;
+      example?: string;
+    }>;
+    common_mistakes_to_avoid: Array<{
+      title: string;
+      description: string;
+      example: string;
+    }>;
+  }
