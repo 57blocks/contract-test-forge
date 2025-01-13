@@ -7,8 +7,16 @@
   },
   "scripts": {
     "build": "tsc",
+    "pkg": "ts-node scripts/build.ts",
     "start": "ts-node src/index.ts",
     "dev": "ts-node src/index.ts"
+  },
+  "pkg": {
+    "scripts": "dist/**/*.js",
+    "assets": [
+      "node_modules/**/*"
+    ],
+    "outputPath": "bin"
   },
   "dependencies": {
     "@solidity-parser/parser": "^0.19.0",
@@ -22,6 +30,7 @@
   "devDependencies": {
     "@types/commander": "^2.12.5",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.10.5"
+    "@types/node": "^22.10.5",
+    "pkg": "^5.8.1"
   }
 }
