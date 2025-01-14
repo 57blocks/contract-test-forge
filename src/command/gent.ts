@@ -5,12 +5,17 @@ import * as yaml from "js-yaml";
 import * as readline from "readline";
 import chalk from "chalk";
 import { parseContract } from "../lib/contract-parse";
-import { ProjectConfig, TestGenerator } from "../types";
+import {
+  GeneratedTest,
+  ProjectConfig,
+  TestGenerator,
+} from "../types";
 import { TestAnalyzer } from "../lib/test-analyzer";
 import { CONFIG_PROJECT_FILE_NAME } from "../constants";
 import { TestGeneratorService } from "../lib/test-generator";
 import { TestRefactor } from "../lib/test-refactor";
 import { TestMerger } from "../lib/test-merger";
+import { FileManager } from "../lib/file-manager";
 
 function askForConfirmation(question: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -138,7 +143,7 @@ ctf gentest -f MyContract.sol -m myMethod
 
       console.log(chalk.yellow("Analyzing test cases for contract file..."));
       const aiService = new TestAnalyzer(ctfPath);
-      const analyzedFunctions = [];
+      const analyzedFunctions: TestGenerator[] = [];
 
       for (const func of targetFunctions) {
         console.debug(
@@ -174,6 +179,7 @@ ctf gentest -f MyContract.sol -m myMethod
 
           // save confirmed analysis
           analyzedFunctions.push({
+            contractName: file,
             code: func.code,
             analysis,
           });
@@ -184,11 +190,15 @@ ctf gentest -f MyContract.sol -m myMethod
         }
       }
 
+      // initialize FileManager
+      const fileManager = new FileManager(ctfPath);
+
       // generate test cases
       console.log(chalk.yellow("Generating test cases..."));
       const testGenerator = new TestGeneratorService(ctfPath);
-      const generateTests = [];
+      const generateTests: GeneratedTest[] = [];
       const contractName = path.basename(file, path.extname(file));
+
       for (const analyzedFunction of analyzedFunctions) {
         console.log(
           chalk.yellow(
@@ -196,13 +206,9 @@ ctf gentest -f MyContract.sol -m myMethod
           )
         );
         try {
-          const testData: TestGenerator = {
-            contractName,
-            code: analyzedFunction.code,
-            analysis: analyzedFunction.analysis,
-          };
-
-          const generatedTest = await testGenerator.generateTest(testData);
+          const generatedTest = await testGenerator.generateTest(
+            analyzedFunction
+          );
           generateTests.push(generatedTest);
           console.log(chalk.green("Test case generated"));
         } catch (error) {
@@ -210,16 +216,15 @@ ctf gentest -f MyContract.sol -m myMethod
           throw error;
         }
       }
+      fileManager.saveGeneratedTests(contractName, generateTests);
 
-      if (generateTests.length === 0) {
-        console.log(chalk.red("No test cases to generate"));
-        process.exit(0);
-      }
-
+      // merge test cases
       console.log(chalk.yellow("Merging test cases..."));
       const testMerger = new TestMerger(ctfPath);
       const testCode = await testMerger.mergeTests(contractName, generateTests);
+      fileManager.saveMergedTest(contractName, testCode);
 
+      // refactor test cases
       console.log(chalk.yellow("Refactoring test cases..."));
       const testRefactor = new TestRefactor(ctfPath);
       const refactoredTestCode = await testRefactor.refactorTests(
@@ -227,6 +232,7 @@ ctf gentest -f MyContract.sol -m myMethod
         testCode
       );
 
+      // write final test file
       console.log(chalk.yellow("Writing the final test file..."));
       writeTestFile(
         path.join(currentDir, projectConfig.test_dir),
@@ -240,6 +246,20 @@ ctf gentest -f MyContract.sol -m myMethod
             projectConfig.test_dir,
             path.basename(file, path.extname(file)) + ".test.ts"
           )}`
+        )
+      );
+
+      // display the location of intermediate files
+      console.log(chalk.gray("\nIntermediate files are saved in:"));
+      console.log(
+        chalk.gray(` - Generated: .ctf/build/generated/${contractName}_*.json`)
+      );
+      console.log(
+        chalk.gray(` - Merged: .ctf/build/merged/${contractName}.test.ts`)
+      );
+      console.log(
+        chalk.gray(
+          ` - Refactored: .ctf/build/refactored/${contractName}.test.ts`
         )
       );
     });

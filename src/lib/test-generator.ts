@@ -59,15 +59,19 @@ export class TestGeneratorService {
       });
 
       const response = completion.choices[0]?.message?.content || "";
-      return this.parseTestResponse(response);
+      return this.parseTestResponse(response, data.analysis.methodName);
     } catch (error) {
       throw new Error(`Failed to generate test: ${error}`);
     }
   }
 
-  private parseTestResponse(response: string): GeneratedTest {
+  private parseTestResponse(
+    response: string,
+    methodName: string
+  ): GeneratedTest {
     try {
-      return JSON.parse(response) as GeneratedTest;
+      const test = JSON.parse(response) as GeneratedTest;
+      return { ...test, methodName };
     } catch (error) {
       console.error("Failed to parse test response:", error);
       console.error("Response:", response);

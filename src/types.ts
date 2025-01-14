@@ -21,7 +21,7 @@ export interface ContractFunction {
 }
 
 export interface TestCase {
-  type: 'positive' | 'negative';
+  type: "positive" | "negative";
   description: string;
 }
 
@@ -37,6 +37,7 @@ export interface TestGenerator {
 }
 
 export interface GeneratedTest {
+  methodName: string;
   imports: string[];
   setupCode: string;
   testCases: string;
@@ -48,15 +49,15 @@ export interface AiConfig {
 }
 
 export interface TestPattern {
-    evm_unit_test_principles: Array<{
-      title: string;
-      description: string;
-      examples?: string;
-      example?: string;
-    }>;
-    common_mistakes_to_avoid: Array<{
-      title: string;
-      description: string;
-      example: string;
-    }>;
-  }
+  evm_unit_test_principles: Array<{
+    title: string;
+    description: string;
+    examples?: string;
+    example?: string;
+  }>;
+  common_mistakes_to_avoid: Array<{
+    title: string;
+    description: string;
+    example: string;
+  }>;
+}
