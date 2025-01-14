@@ -57,9 +57,10 @@ npm link
 
 ## Configuration
 
-### 1. Initialize CTF in your project:
+### 1. Initialize CTF in the example project:
 
 ```bash
+cd examples/eth
 ctf init
 ```
 
@@ -77,20 +78,22 @@ api_key: "your-api-key-here"
 Generate test cases for a specific contract:
 
 ```bash
-ctf gent -f YourContract.sol
+ctf gent -f Faucet.sol
 ```
 
 Generate test cases for a specific method:
 
 ```bash
-ctf gent -f YourContract.sol -m methodName
+ctf gent -f Faucet.sol -m withdraw 
 ```
 
 Auto-confirm test cases:
 
 ```bash
-ctf gent -f YourContract.sol -y
+ctf gent -f Faucet.sol -y
 ```
+
+Then the test cases will be generated in the `test` directory.
 
 ### Project Structure
 
