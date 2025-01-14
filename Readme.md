@@ -11,6 +11,8 @@ CTF is a command-line tool that helps you generate comprehensive test cases for 
 - 📝 Comprehensive test coverage
 - 🚀 Easy to use CLI interface
 
+![](./media/flow.png)
+
 ## Installation
 
 You can install CTF in two ways:
