@@ -2,6 +2,8 @@
 
 CTF is a command-line tool that helps you generate comprehensive test cases for Solidity smart contracts using AI. It analyzes your contract functions and generates TypeScript test files using Hardhat and ethers.js.
 
+<img src="./medie/flow.png" alt="CTF workflow" width="500">
+
 ## Features
 
 - 🔍 Automatic contract function analysis
@@ -10,8 +12,6 @@ CTF is a command-line tool that helps you generate comprehensive test cases for 
 - 🧪 Hardhat and ethers.js integration
 - 📝 Comprehensive test coverage
 - 🚀 Easy to use CLI interface
-
-<img src="./medie/flow.png" alt="CTF workflow" width="500">
 
 ## Installation
 
@@ -86,7 +86,7 @@ ctf gent -f Faucet.sol
 Generate test cases for a specific method:
 
 ```bash
-ctf gent -f Faucet.sol -m withdraw 
+ctf gent -f Faucet.sol -m withdraw
 ```
 
 Auto-confirm test cases:
