@@ -3,12 +3,7 @@ import * as path from "path";
 import * as yaml from "js-yaml";
 import OpenAI from "openai";
 import { TestGenerator, GeneratedTest, AiConfig, TestPattern } from "../types";
-import {
-  TEST_GENERATE_SYSTEM_PROMPT,
-  testGeneratePrompt,
-  TEST_MERGE_SYSTEM_PROMPT,
-  testMergePrompt,
-} from "../prompt";
+import { TEST_GENERATE_SYSTEM_PROMPT, testGeneratePrompt } from "../prompt";
 import { CONFIG_AI_FILE_NAME } from "../constants";
 import { testCraft } from "../pattern/test-craft";
 import { eal } from "../pattern/eal";
@@ -76,46 +71,6 @@ export class TestGeneratorService {
     } catch (error) {
       console.error("Failed to parse test response:", error);
       console.error("Response:", response);
-      throw error;
-    }
-  }
-
-  public async writeTestFile(
-    testDir: string,
-    contractFile: string,
-    tests: GeneratedTest[]
-  ): Promise<void> {
-    const contractName = path.basename(
-      contractFile,
-      path.extname(contractFile)
-    );
-    const testFilePath = path.join(testDir, `${contractName}.test.ts`);
-    const testContent = await this.mergeTests(contractName, tests);
-    fs.writeFileSync(testFilePath, testContent);
-  }
-
-  private async mergeTests(
-    contractName: string,
-    tests: GeneratedTest[]
-  ): Promise<string> {
-    try {
-      const completion = await this.openai.chat.completions.create({
-        model: this.config.model,
-        messages: [
-          {
-            role: "system",
-            content: TEST_MERGE_SYSTEM_PROMPT,
-          },
-          {
-            role: "user",
-            content: testMergePrompt(contractName, tests),
-          },
-        ],
-      });
-
-      return completion.choices[0]?.message?.content || "";
-    } catch (error) {
-      console.error("Failed to merge tests:", error);
       throw error;
     }
   }

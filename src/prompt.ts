@@ -2,11 +2,11 @@ import { GeneratedTest, TestGenerator, TestPattern } from "./types";
 
 function formatTestingPrinciples(patterns: TestPattern): string {
   const principles = patterns.evm_unit_test_principles
-    .map(p => `${p.title}: ${p.description}`)
+    .map((p) => `${p.title}: ${p.description}`)
     .join("\n");
 
   const mistakes = patterns.common_mistakes_to_avoid
-    .map(m => `${m.title}: ${m.description}`)
+    .map((m) => `${m.title}: ${m.description}`)
     .join("\n");
 
   return `
@@ -49,7 +49,9 @@ Function code:
 ${code}
 `;
 
-export const TEST_GENERATE_SYSTEM_PROMPT = (patterns: TestPattern) => `You are a smart contract testing expert. Generate comprehensive test code using Hardhat and ethers.js with TypeScript.
+export const TEST_GENERATE_SYSTEM_PROMPT = (
+  patterns: TestPattern
+) => `You are a smart contract testing expert. Generate comprehensive test code using Hardhat and ethers.js with TypeScript.
 Follow these testing principles and patterns:
 
 ${formatTestingPrinciples(patterns)}
@@ -158,7 +160,10 @@ Requirements:
 7. Use proper TypeScript types and async/await syntax
 8. Ensure proper error handling and event verification`;
 
-export function testMergePrompt(contractName: string, tests: GeneratedTest[]): string {
+export function testMergePrompt(
+  contractName: string,
+  tests: GeneratedTest[]
+): string {
   return `
 Merge the following test implementations into a single test file for contract "${contractName}".
 
@@ -195,4 +200,85 @@ Requirements:
 12. Do not reduce the existing test cases
 
 Return the complete test file content directly, without any additional text or formatting.`;
+}
+
+export const TEST_REFACTOR_SYSTEM_PROMPT = `You are a smart contract testing expert. Review and refactor the test code to ensure best practices and fix any issues.
+Return ONLY the refactored test file content, without any markdown formatting, explanations, or code blocks.
+
+Review and fix the following potential issues:
+1. Ensure beforeEach is inside the main describe block
+2. Check for duplicate test cases
+3. Verify proper error handling
+4. Ensure consistent naming conventions
+5. Check for proper async/await usage
+6. Verify proper event testing
+7. Ensure proper setup and teardown
+8. Check for hardcoded values
+9. Verify proper type usage
+10. Ensure proper test isolation
+
+Example of proper test structure:
+
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { Contract, SignerWithAddress } from "ethers";
+
+describe("ContractName", () => {
+  let owner: SignerWithAddress;
+  let nonOwner: SignerWithAddress;
+  let contract: Contract;
+
+  async function deployFixture() {
+    const [owner, nonOwner] = await ethers.getSigners();
+    const Factory = await ethers.getContractFactory("ContractName");
+    const contract = await Factory.deploy();
+    await contract.deployed();
+    return { contract, owner, nonOwner };
+  }
+
+  beforeEach(async () => {
+    const { contract: _contract, owner: _owner, nonOwner: _nonOwner } = await loadFixture(deployFixture);
+    contract = _contract;
+    owner = _owner;
+    nonOwner = _nonOwner;
+  });
+
+  describe("method1", () => {
+    it("should succeed with valid parameters", async function() {
+      await expect(contract.method1())
+        .to.emit(contract, "Event")
+        .withArgs(expectedArgs);
+    });
+  });
+});`;
+
+export function testRefactorPrompt(
+  contractName: string,
+  testCode: string
+): string {
+  return `
+Review and refactor the following test code for contract "${contractName}".
+Fix any issues and ensure it follows best practices.
+
+Current test code:
+${testCode}
+
+Requirements:
+1. Return ONLY the refactored test code
+2. Do not include any markdown formatting or explanations
+3. Do not wrap the response in code blocks
+4. Ensure beforeEach is inside the main describe block
+5. Remove any duplicate test cases
+6. Fix any improper error handling
+7. Use consistent naming conventions
+8. Fix any async/await issues
+9. Ensure proper event testing
+10. Remove any hardcoded values
+11. Fix any type issues
+12. Ensure proper test isolation
+13. Do not remove or reduce test coverage
+14. Keep all existing test cases but improve their implementation
+
+Return the refactored test code directly, without any additional text or formatting.`;
 }

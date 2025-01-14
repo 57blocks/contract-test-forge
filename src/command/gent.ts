@@ -6,9 +6,11 @@ import * as readline from "readline";
 import chalk from "chalk";
 import { parseContract } from "../lib/contract-parse";
 import { ProjectConfig, TestGenerator } from "../types";
-import { TestAnalyzer} from "../lib/test-analyzer";
+import { TestAnalyzer } from "../lib/test-analyzer";
 import { CONFIG_PROJECT_FILE_NAME } from "../constants";
 import { TestGeneratorService } from "../lib/test-generator";
+import { TestRefactor } from "../lib/test-refactor";
+import { TestMerger } from "../lib/test-merger";
 
 function askForConfirmation(question: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -22,6 +24,17 @@ function askForConfirmation(question: string): Promise<boolean> {
       resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
     });
   });
+}
+
+function writeTestFile(
+  testDir: string,
+  contractFile: string,
+  testCode: string
+): void {
+  const contractName = path.basename(contractFile, path.extname(contractFile));
+  const testFilePath = path.join(testDir, `${contractName}.test.ts`);
+  // write to file
+  fs.writeFileSync(testFilePath, testCode);
 }
 
 export function gent(program: Command) {
@@ -41,10 +54,7 @@ ctf gentest -f MyContract.sol -m myMethod
       "-m, --method <method>",
       "The contract method to generate test cases"
     )
-    .option(
-      "-y, --yes",
-      "Automatically confirm the test cases"
-    )
+    .option("-y, --yes", "Automatically confirm the test cases")
     .action(async (options) => {
       const { file, method } = options;
       if (!file) {
@@ -142,7 +152,9 @@ ctf gentest -f MyContract.sol -m myMethod
         );
 
         try {
-          console.log(chalk.yellow(`Analyze the test cases for method ${func.name}...`));
+          console.log(
+            chalk.yellow(`Analyze the test cases for method ${func.name}...`)
+          );
           const analysis = await aiService.analyzeFunction(func, file);
 
           // show analysis result
@@ -204,11 +216,22 @@ ctf gentest -f MyContract.sol -m myMethod
         process.exit(0);
       }
 
-      console.log(chalk.yellow("Generating the final test file..."));
-      await testGenerator.writeTestFile(
+      console.log(chalk.yellow("Merging test cases..."));
+      const testMerger = new TestMerger(ctfPath);
+      const testCode = await testMerger.mergeTests(contractName, generateTests);
+
+      console.log(chalk.yellow("Refactoring test cases..."));
+      const testRefactor = new TestRefactor(ctfPath);
+      const refactoredTestCode = await testRefactor.refactorTests(
+        contractName,
+        testCode
+      );
+
+      console.log(chalk.yellow("Writing the final test file..."));
+      writeTestFile(
         path.join(currentDir, projectConfig.test_dir),
         file,
-        generateTests
+        refactoredTestCode
       );
 
       console.log(
