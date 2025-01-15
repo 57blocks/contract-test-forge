@@ -7,9 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  compile:
+  build-linux:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,26 +21,63 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build binaries
+      - name: Build Linux binary
         run: npm run pkg
 
-      - name: Upload artifacts
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build macOS binary
+        run: |
+          npm run pkg
+          chmod +x ./bin/ctf_darwin_arm64
+          codesign --force --sign - ./bin/ctf_darwin_arm64
+
+  upload-artifacts:
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: artifacts/linux
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-binary
+          path: artifacts/macos
+
+      - name: Upload combined artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: |
-            ./bin/ctf_linux_amd64
-            ./bin/ctf_darwin_arm64
+            artifacts/linux/ctf_linux_amd64
+            artifacts/macos/ctf_darwin_arm64
           if-no-files-found: error
           retention-days: 1
 
   release:
-    needs: compile
+    needs: upload-artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          name: binaries
           path: artifacts
           merge-multiple: true
 

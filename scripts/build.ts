@@ -1,9 +1,32 @@
 import { exec } from "child_process";
 import * as util from "util";
 import * as fs from "fs";
-import * as path from "path";
 
 const execAsync = util.promisify(exec);
+
+async function buildLinuxAmd64() {
+  try {
+    console.log("Building Linux AMD64 binary...");
+    await execAsync("pkg . --target node18-linux-x64 --output bin/ctf");
+    fs.renameSync("bin/ctf", "bin/ctf_linux_amd64");
+    console.log("Linux AMD64 binary built successfully");
+  } catch (error) {
+    console.error("Failed to build Linux binary:", error);
+    throw error;
+  }
+}
+
+async function buildDarwinArm64() {
+  try {
+    console.log("Building macOS ARM64 binary...");
+    await execAsync("pkg . --target node18-darwin-arm64 --output bin/ctf");
+    fs.renameSync("bin/ctf", "bin/ctf_darwin_arm64");
+    console.log("macOS ARM64 binary built successfully");
+  } catch (error) {
+    console.error("Failed to build macOS binary:", error);
+    throw error;
+  }
+}
 
 async function build() {
   try {
@@ -16,15 +39,13 @@ async function build() {
       fs.mkdirSync("bin");
     }
 
-    // use pkg to package
-    console.log("Packaging binaries...");
-    await execAsync(
-      "pkg . --targets node18-linux-x64,node18-darwin-arm64 --output bin/ctf"
-    );
-
-    // rename output files
-    fs.renameSync("bin/ctf-linux-x64", "bin/ctf_linux_amd64");
-    fs.renameSync("bin/ctf-macos-arm64", "bin/ctf_darwin_arm64");
+    // build platform specific binaries
+    const platform = process.platform;
+    if (platform === "darwin") {
+      await buildDarwinArm64();
+    } else {
+      await buildLinuxAmd64();
+    }
 
     console.log("Build complete! Binaries are in the bin directory");
   } catch (error) {
