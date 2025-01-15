@@ -27,7 +27,7 @@ jobs:
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: linux-binaries
           path: bin/ctf_linux_amd64
           if-no-files-found: error
 
@@ -54,7 +54,7 @@ jobs:
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: macos-binaries
           path: bin/ctf_darwin_arm64
           if-no-files-found: error
 
